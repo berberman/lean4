@@ -186,6 +186,7 @@ def Info.stx : Info → Syntax
   | ofChoiceInfo i         => i.stx
   | ofDocInfo i            => i.stx
   | ofDocElabInfo i        => i.stx
+  | ofNamespaceInfo i      => i.stx
 
 def Info.lctx : Info → LocalContext
   | .ofTermInfo i           => i.lctx
@@ -297,7 +298,10 @@ partial def InfoTree.hoverableInfoAtM? [Monad m] (t : InfoTree) (hoverPos : Stri
       || info.toElabInfo?.any (·.elaborator == `Lean.Elab.Tactic.evalWithAnnotateState)
     if isAuxInfo then
       return none
-    let isEligibleInfoKind := info matches .ofFieldInfo _ | .ofOptionInfo _ | .ofErrorNameInfo _ || info.toElabInfo?.isSome
+    let isEligibleInfoKind :=
+      match info with
+      | .ofFieldInfo _ | .ofOptionInfo _ | .ofErrorNameInfo _ | .ofNamespaceInfo _ => true
+      | _ => info.toElabInfo?.isSome
     let some r := info.stx.getRange? (canonicalOnly := true)
       | return none
     if ! r.contains hoverPos includeStop || ! isEligibleInfoKind then

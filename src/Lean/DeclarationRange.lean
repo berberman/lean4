@@ -7,6 +7,7 @@ module
 
 prelude
 public import Lean.MonadEnv
+import Init.Data.Range.Polymorphic.Stream
 
 public section
 
@@ -47,5 +48,22 @@ def findDeclarationRanges? [Monad m] [MonadEnv m] [MonadLiftT BaseIO m] (declNam
   match ranges with
   | none => return (← builtinDeclRanges.get (m := BaseIO)).find? declName
   | some _ => return ranges
+
+builtin_initialize namespaceDeclExt : SimplePersistentEnvExtension (Name × DeclarationRanges) (NameMap (Array (Option ModuleIdx × DeclarationRanges))) ←
+  registerSimplePersistentEnvExtension {
+    addEntryFn := fun s (n, r) => s.insert n (s.find? n |>.getD #[] |>.push (none, r))
+    addImportedFn := fun es => Id.run do
+      let mut s : NameMap (Array (Option ModuleIdx × DeclarationRanges)) := {}
+      for arr in es, modIdx in 0...* do
+        for (n, r) in arr do
+          s := s.insert n (s.find? n |>.getD #[] |>.push (some modIdx, r))
+      return s
+  }
+
+def addNamespaceDeclarationRanges [Monad m] [MonadEnv m] (ns : Name) (declRanges : DeclarationRanges) : m Unit := do
+  modifyEnv fun env => namespaceDeclExt.addEntry env (ns, declRanges)
+
+def findNamespaceDeclarationRanges? [Monad m] [MonadEnv m] (ns : Name): m (Option (Array (Option ModuleIdx × DeclarationRanges))) := do
+  return namespaceDeclExt.getState (← getEnv) |>.find? ns
 
 end Lean

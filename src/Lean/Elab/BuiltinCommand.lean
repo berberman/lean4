@@ -43,7 +43,8 @@ namespace Lean.Elab.Command
   | _ => throwErrorAt stx "unexpected module doc string{indentD <| stx}"
 
 private def addScope (isNewNamespace : Bool) (header : String) (newNamespace : Name)
-    (isNoncomputable isPublic isMeta : Bool := false) (attrs : List (TSyntax ``Parser.Term.attrInstance) := []) :
+    (isNoncomputable isPublic isMeta : Bool := false) (attrs : List (TSyntax ``Parser.Term.attrInstance) := [])
+    (declRanges? : Option DeclarationRanges := none) :
     CommandElabM Unit := do
   modify fun s => { s with
     env    := s.env.registerNamespace newNamespace,
@@ -58,20 +59,22 @@ private def addScope (isNewNamespace : Bool) (header : String) (newNamespace : N
   pushScope
   if isNewNamespace then
     activateScoped newNamespace
+    if let some declRanges := declRanges? then
+      addNamespaceDeclarationRanges newNamespace declRanges
 
 private def addScopes (header : Name) (isNewNamespace : Bool) (isNoncomputable isPublic isMeta : Bool := false)
-    (attrs : List (TSyntax ``Parser.Term.attrInstance) := []) : CommandElabM Unit :=
+    (attrs : List (TSyntax ``Parser.Term.attrInstance) := []) (declRanges? : Option DeclarationRanges := none) : CommandElabM Unit :=
   go header
 where go
   | .anonymous => pure ()
   | .str p header => do
     go p
     let currNamespace ← getCurrNamespace
-    addScope isNewNamespace header (if isNewNamespace then Name.mkStr currNamespace header else currNamespace) isNoncomputable isPublic isMeta attrs
+    addScope isNewNamespace header (if isNewNamespace then Name.mkStr currNamespace header else currNamespace) isNoncomputable isPublic isMeta attrs declRanges?
   | _ => throwError "invalid scope"
 
-private def addNamespace (header : Name) : CommandElabM Unit :=
-  addScopes (isNewNamespace := true) (isNoncomputable := false) (attrs := []) header
+private def addNamespace (header : Name) (declRanges? : Option DeclarationRanges := none) : CommandElabM Unit :=
+  addScopes (isNewNamespace := true) (isNoncomputable := false) (attrs := []) (declRanges? := declRanges?) header
 
 private def popScopes (numScopes : Nat) : CommandElabM Unit :=
   for _ in *...numScopes do
@@ -100,7 +103,11 @@ private def checkEndHeader : Name → List Scope → Option Name
 
 @[builtin_command_elab «namespace»] def elabNamespace : CommandElab := fun stx =>
   match stx with
-  | `(namespace $n) => addNamespace n.getId
+  | `(namespace $n) => do
+      let range? ← getDeclarationRange? stx
+      let selectionRange? ← getDeclarationRange? <| getDeclarationSelectionRef stx
+      let declRanges? := range?.map fun range => {range, selectionRange := selectionRange?.getD range : DeclarationRanges}
+      addNamespace n.getId declRanges?
   | _               => throwUnsupportedSyntax
 
 @[builtin_command_elab «section»] def elabSection : CommandElab := fun stx => do

@@ -248,6 +248,10 @@ that a given piece of documentation syntax in fact has been elaborated.
 -/
 structure DocInfo extends ElabInfo where
 
+structure NamespaceInfo where
+  ns : Name
+  stx : Syntax
+deriving Inhabited
 
 /-- Header information for a node in `InfoTree`. -/
 inductive Info where
@@ -268,6 +272,7 @@ inductive Info where
   | ofChoiceInfo (i : ChoiceInfo)
   | ofDocInfo (i : DocInfo)
   | ofDocElabInfo (i : DocElabInfo)
+  | ofNamespaceInfo (i : NamespaceInfo)
   deriving Inhabited
 
 /-- The InfoTree is a structure that is generated during elaboration and used

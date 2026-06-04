@@ -307,6 +307,24 @@ def locationLinksFromCommandInfo (i : CommandInfo) : GoToM (Array LeanLocationLi
     return #[]
   locationLinksFromImport i
 
+def locationLinksFromNamespaceInfo (i : NamespaceInfo) : GoToM (Array LeanLocationLink) := do
+  let some ranges ← findNamespaceDeclarationRanges? i.ns | return #[]
+  let mut r : Array LeanLocationLink := #[]
+  let env ← getEnv
+  let doc := (← read).doc
+  for (mIdx, range) in ranges do
+    let moduleName := mIdx.map (fun idx => env.header.moduleNames[idx]!) |>.getD doc.mod
+    let some uri ← documentUriFromModule? moduleName | continue
+    r := r.push {
+      targetUri := uri,
+      targetRange := range.range.toLspRange,
+      targetSelectionRange := range.selectionRange.toLspRange,
+      ident? := none,
+      originSelectionRange? := i.stx.getRange? (canonicalOnly := true).map (·.toLspRange doc.text),
+      isDefault := false
+    }
+  return r
+
 def locationLinksOfInfo (doc : DocumentMeta) (kind : GoToKind) (ictx : InfoWithCtx)
     (infoTree? : Option InfoTree := none) : IO (Array LeanLocationLink) := do
   let ctx : GoToContext := {
@@ -333,6 +351,8 @@ def locationLinksOfInfo (doc : DocumentMeta) (kind : GoToKind) (ictx : InfoWithC
         locationLinksFromErrorNameInfo eni
       | .ofDocElabInfo dei =>
         locationLinksFromDecl dei.name
+      | .ofNamespaceInfo ni =>
+        locationLinksFromNamespaceInfo ni
       | _ =>
         pure #[]
     if kind == .declaration || ll.isEmpty then

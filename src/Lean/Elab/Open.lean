@@ -75,13 +75,15 @@ def elabOpenDecl [MonadOptions m] [MonadResolveName m] [MonadInfoTree m] (stx : 
     match stx with
     | `(Parser.Command.openDecl| $nss*) =>
       for ns in nss do
-        for ns in (← resolveNamespace ns) do
-          addOpenDecl (OpenDecl.simple ns [])
-          activateScoped ns
+        for ns' in (← resolveNamespace ns) do
+          pushInfoLeaf <| .ofNamespaceInfo {ns := ns', stx := ns}
+          addOpenDecl (OpenDecl.simple ns' [])
+          activateScoped ns'
     | `(Parser.Command.openDecl| scoped $nss*) =>
       for ns in nss do
-        for ns in (← resolveNamespace ns) do
-          activateScoped ns
+        for ns' in (← resolveNamespace ns) do
+          pushInfoLeaf <| .ofNamespaceInfo {ns := ns', stx := ns}
+          activateScoped ns'
     | `(Parser.Command.openDecl| $ns ($ids*)) =>
       let nss ← resolveNamespace ns
       for idStx in ids do
@@ -90,18 +92,20 @@ def elabOpenDecl [MonadOptions m] [MonadResolveName m] [MonadInfoTree m] (stx : 
           addConstInfo idStx declName
         addOpenDecl (OpenDecl.explicit idStx.getId declName)
     | `(Parser.Command.openDecl| $ns hiding $ids*) =>
-      let ns ← resolveUniqueNamespace ns
-      activateScoped ns
+      let ns' ← resolveUniqueNamespace ns
+      pushInfoLeaf <| .ofNamespaceInfo {ns := ns', stx := ns}
+      activateScoped ns'
       for id in ids do
-        let declName ← resolveId ns id
+        let declName ← resolveId ns' id
         if (← getInfoState).enabled then
           addConstInfo id declName
       let ids := ids.map (·.getId) |>.toList
-      addOpenDecl (OpenDecl.simple ns ids)
+      addOpenDecl (OpenDecl.simple ns' ids)
     | `(Parser.Command.openDecl| $ns renaming $[$froms -> $tos],*) =>
-      let ns ← resolveUniqueNamespace ns
+      let ns' ← resolveUniqueNamespace ns
+      pushInfoLeaf <| .ofNamespaceInfo {ns := ns', stx := ns}
       for («from», to) in froms.zip tos do
-        let declName ← resolveId ns «from»
+        let declName ← resolveId ns' «from»
         if (← getInfoState).enabled then
           addConstInfo «from» declName
           addConstInfo to declName
