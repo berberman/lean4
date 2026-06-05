@@ -58,6 +58,9 @@ builtin_initialize namespaceDeclExt : SimplePersistentEnvExtension (Name × Decl
         for (n, r) in arr do
           s := s.insert n (s.find? n |>.getD #[] |>.push (some modIdx, r))
       return s
+    exportEntriesFnEx? := some fun _ _ s =>
+    let ents := s.toArray
+    { exported := #[], server := ents, «private» := ents }
   }
 
 def addNamespaceDeclarationRanges [Monad m] [MonadEnv m] (ns : Name) (declRanges : DeclarationRanges) : m Unit := do
